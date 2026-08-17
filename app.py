@@ -21,11 +21,12 @@ def save_data(data):
 
 # --- 2. ELO ENGINE ---
 def calculate_elo(r_a, r_b, outcome, k=32):
+    """Calculates exact Elo ratings without mid-calculation rounding drift."""
     e_a = 1 / (1 + 10 ** ((r_b - r_a) / 400))
     e_b = 1 - e_a
     new_r_a = r_a + k * (outcome - e_a)
     new_r_b = r_b + k * ((1 - outcome) - e_b)
-    return round(new_r_a), round(new_r_b)
+    return new_r_a, new_r_b  # Raw floats returned for exact precision
 
 
 def compute_all_ratings(data):
@@ -39,10 +40,10 @@ def compute_all_ratings(data):
         winner = match["winner"].strip().upper()
         season = match.get("season", 1)
 
-        # Auto-detect and initialize new players at 1500
+        # Auto-detect and initialize new players at 1500.0 baseline
         for p in [p1, p2]:
             if p not in all_time:
-                all_time[p] = 1500
+                all_time[p] = 1500.0
             if p not in player_stats:
                 player_stats[p] = {"played": 0, "wins": 0, "losses": 0}
 
@@ -51,7 +52,7 @@ def compute_all_ratings(data):
 
         for p in [p1, p2]:
             if p not in seasons[season]:
-                seasons[season][p] = 1500
+                seasons[season][p] = 1500.0
 
         # Update Win/Loss Stats
         player_stats[p1]["played"] += 1
@@ -112,7 +113,7 @@ with tab1:
                 records.append(
                     {
                         "Player": p,
-                        "All-Time Elo": elo,
+                        "All-Time Elo": round(elo),
                         "Matches": stats["played"],
                         "W": stats["wins"],
                         "L": stats["losses"],
@@ -124,11 +125,13 @@ with tab1:
                 df = df.sort_values(by="All-Time Elo", ascending=False)
         else:
             s_num = int(selected_view.split(" ")[1])
-            df = pd.DataFrame(
-                list(season_elos[s_num].items()),
-                columns=["Player", f"Season {s_num} Elo"],
-            )
-            df = df.sort_values(by=f"Season {s_num} Elo", ascending=False)
+            records = [
+                {"Player": p, f"Season {s_num} Elo": round(elo)}
+                for p, elo in season_elos[s_num].items()
+            ]
+            df = pd.DataFrame(records)
+            if not df.empty:
+                df = df.sort_values(by=f"Season {s_num} Elo", ascending=False)
 
         if not df.empty:
             df.index = range(1, len(df) + 1)
@@ -143,12 +146,12 @@ with tab1:
             inspect_p = st.selectbox(
                 "Select Player", options=all_known_players
             )
-            st.metric("All-Time Elo", all_time_elo.get(inspect_p, 1500))
+            st.metric("All-Time Elo", round(all_time_elo.get(inspect_p, 1500)))
 
             s_breakdown = {}
             for s_num, s_dict in season_elos.items():
                 if inspect_p in s_dict:
-                    s_breakdown[f"Season {s_num}"] = s_dict[inspect_p]
+                    s_breakdown[f"Season {s_num}"] = round(s_dict[inspect_p])
 
             st.write("**Seasonal Elo Ratings:**")
             st.json(s_breakdown)
@@ -183,7 +186,7 @@ with tab2:
                 }
                 data["matches"].append(new_match)
 
-                # Ensure player names are saved in the players list
+                # Ensure player names are registered
                 for p in [p1, p2]:
                     if p not in data["players"]:
                         data["players"].append(p)
@@ -218,7 +221,7 @@ with tab3:
             for idx, m in enumerate(data["matches"]):
                 m["id"] = idx + 1
             save_data(data)
-            st.warning(f"Deleted Match #{match_to_delete}. Ratings updated!")
+            st.warning(f"Deleted Match #{match_to_delete}. Ratings recalculated!")
             st.rerun()
     else:
         st.info("No matches logged yet.")
