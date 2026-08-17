@@ -197,7 +197,7 @@ with tab2:
                 )
                 st.rerun()
 
-# TAB 3: MANAGE MATCHES & DELETIONS
+# TAB 3: MANAGE MATCHES & PLAYERS
 with tab3:
     st.header("Match History & Deletion")
 
@@ -225,3 +225,46 @@ with tab3:
             st.rerun()
     else:
         st.info("No matches logged yet.")
+
+    st.markdown("---")
+    st.header("✏️ Rename Player Records")
+
+    existing_p = sorted(list(set(data["players"] + list(all_time_elo.keys()))))
+    if existing_p:
+        col_r1, col_r2 = st.columns(2)
+        with col_r1:
+            old_name = st.selectbox("Select Current Player Name", options=existing_p)
+        with col_r2:
+            new_name = st.text_input("Enter New Name").strip().upper()
+
+        if st.button("Rename Player Across All Matches"):
+            if new_name and old_name:
+                if old_name == new_name:
+                    st.error("New name must be different from the old name!")
+                else:
+                    # 1. Update matches array
+                    updated_count = 0
+                    for m in data["matches"]:
+                        if m["player1"] == old_name:
+                            m["player1"] = new_name
+                            updated_count += 1
+                        if m["player2"] == old_name:
+                            m["player2"] = new_name
+                            updated_count += 1
+                        if m["winner"] == old_name:
+                            m["winner"] = new_name
+
+                    # 2. Update players array
+                    data["players"] = [
+                        new_name if p == old_name else p for p in data["players"]
+                    ]
+                    if new_name not in data["players"]:
+                        data["players"].append(new_name)
+
+                    save_data(data)
+                    st.success(
+                        f"Successfully renamed '{old_name}' to '{new_name}' across all records! Ratings recalculated."
+                    )
+                    st.rerun()
+            else:
+                st.error("Please enter a valid new name.")
