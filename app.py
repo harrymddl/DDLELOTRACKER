@@ -32,7 +32,8 @@ def calculate_elo(r_a, r_b, outcome, k=32):
 def compute_all_ratings(data):
     all_time = {}
     seasons = {}
-    player_stats = {}
+    player_stats = {}  # Career win/loss stats
+    season_stats = {}  # Seasonal win/loss stats
 
     for match in data["matches"]:
         p1 = match["player1"].strip().upper()
@@ -40,29 +41,45 @@ def compute_all_ratings(data):
         winner = match["winner"].strip().upper()
         season = match.get("season", 1)
 
-        # Auto-detect and initialize new players at 1500.0 baseline
+        # Initialize Career Stats
         for p in [p1, p2]:
             if p not in all_time:
                 all_time[p] = 1500.0
             if p not in player_stats:
                 player_stats[p] = {"played": 0, "wins": 0, "losses": 0}
 
+        # Initialize Season Dicts
         if season not in seasons:
             seasons[season] = {}
+        if season not in season_stats:
+            season_stats[season] = {}
 
         for p in [p1, p2]:
             if p not in seasons[season]:
                 seasons[season][p] = 1500.0
+            if p not in season_stats[season]:
+                season_stats[season][p] = {"played": 0, "wins": 0, "losses": 0}
 
-        # Update Win/Loss Stats
+        # Update Career Stats
         player_stats[p1]["played"] += 1
         player_stats[p2]["played"] += 1
+
+        # Update Seasonal Stats
+        season_stats[season][p1]["played"] += 1
+        season_stats[season][p2]["played"] += 1
+
         if winner == p1:
             player_stats[p1]["wins"] += 1
             player_stats[p2]["losses"] += 1
+
+            season_stats[season][p1]["wins"] += 1
+            season_stats[season][p2]["losses"] += 1
         else:
             player_stats[p2]["wins"] += 1
             player_stats[p1]["losses"] += 1
+
+            season_stats[season][p2]["wins"] += 1
+            season_stats[season][p1]["losses"] += 1
 
         outcome_p1 = 1.0 if winner == p1 else 0.0
 
@@ -74,7 +91,7 @@ def compute_all_ratings(data):
             seasons[season][p1], seasons[season][p2], outcome_p1
         )
 
-    return all_time, seasons, player_stats
+    return all_time, seasons, player_stats, season_stats
 
 
 # --- 3. STREAMLIT APP UI ---
@@ -82,7 +99,7 @@ st.set_page_config(page_title="Darts League Elo Tracker", layout="wide")
 st.title("🎯 Darts League Elo Tracker")
 
 data = load_data()
-all_time_elo, season_elos, player_stats = compute_all_ratings(data)
+all_time_elo, season_elos, player_stats, season_stats = compute_all_ratings(data)
 
 tab1, tab2, tab3 = st.tabs(
     ["📊 Leaderboards", "📝 Log Match", "⚙️ Manage Matches & Players"]
@@ -125,10 +142,26 @@ with tab1:
                 df = df.sort_values(by="All-Time Elo", ascending=False)
         else:
             s_num = int(selected_view.split(" ")[1])
-            records = [
-                {"Player": p, f"Season {s_num} Elo": round(elo)}
-                for p, elo in season_elos[s_num].items()
-            ]
+            records = []
+            for p, elo in season_elos[s_num].items():
+                stats = season_stats[s_num].get(
+                    p, {"played": 0, "wins": 0, "losses": 0}
+                )
+                win_pct = (
+                    f"{(stats['wins'] / stats['played'] * 100):.1f}%"
+                    if stats["played"] > 0
+                    else "0.0%"
+                )
+                records.append(
+                    {
+                        "Player": p,
+                        f"Season {s_num} Elo": round(elo),
+                        "Matches": stats["played"],
+                        "W": stats["wins"],
+                        "L": stats["losses"],
+                        "Win %": win_pct,
+                    }
+                )
             df = pd.DataFrame(records)
             if not df.empty:
                 df = df.sort_values(by=f"Season {s_num} Elo", ascending=False)
@@ -243,14 +276,11 @@ with tab3:
                     st.error("New name must be different from the old name!")
                 else:
                     # 1. Update matches array
-                    updated_count = 0
                     for m in data["matches"]:
                         if m["player1"] == old_name:
                             m["player1"] = new_name
-                            updated_count += 1
                         if m["player2"] == old_name:
                             m["player2"] = new_name
-                            updated_count += 1
                         if m["winner"] == old_name:
                             m["winner"] = new_name
 
