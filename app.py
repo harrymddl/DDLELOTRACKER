@@ -96,7 +96,7 @@ def compute_all_ratings(data):
 
 # --- 3. STREAMLIT APP UI ---
 st.set_page_config(page_title="Darts League Elo Tracker", layout="wide")
-st.title("🎯 Darts League Elo Tracker")
+st.title("DDL Elo Rankings")
 
 data = load_data()
 all_time_elo, season_elos, player_stats, season_stats = compute_all_ratings(data)
