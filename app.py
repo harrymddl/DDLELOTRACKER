@@ -1,12 +1,14 @@
+from github import Github
 import json
 import os
 import pandas as pd
 import streamlit as st
 
 DATA_FILE = "darts_data.json"
+GITHUB_REPO = "harrymddl/DDLELOTRACKER"
 
 
-# --- 1. DATA STORAGE ---
+# --- 1. DATA STORAGE & GITHUB AUTO-SYNC ---
 def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r") as f:
@@ -15,25 +17,41 @@ def load_data():
 
 
 def save_data(data):
+    # Save locally to current session
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=4)
+
+    # Push directly to GitHub repository permanently
+    if "GITHUB_TOKEN" in st.secrets:
+        try:
+            g = Github(st.secrets["GITHUB_TOKEN"])
+            repo = g.get_repo(GITHUB_REPO)
+            contents = repo.get_contents(DATA_FILE)
+            repo.update_file(
+                contents.path,
+                "Auto-sync match result",
+                json.dumps(data, indent=4),
+                contents.sha,
+            )
+            st.success("Synced permanently to GitHub!")
+        except Exception as e:
+            st.error(f"GitHub Sync Error: {e}")
 
 
 # --- 2. ELO ENGINE ---
 def calculate_elo(r_a, r_b, outcome, k=32):
-    """Calculates exact Elo ratings without mid-calculation rounding drift."""
     e_a = 1 / (1 + 10 ** ((r_b - r_a) / 400))
     e_b = 1 - e_a
     new_r_a = r_a + k * (outcome - e_a)
     new_r_b = r_b + k * ((1 - outcome) - e_b)
-    return new_r_a, new_r_b  # Raw floats returned for exact precision
+    return new_r_a, new_r_b
 
 
 def compute_all_ratings(data):
     all_time = {}
     seasons = {}
-    player_stats = {}  # Career win/loss stats
-    season_stats = {}  # Seasonal win/loss stats
+    player_stats = {}
+    season_stats = {}
 
     for match in data["matches"]:
         p1 = match["player1"].strip().upper()
@@ -41,14 +59,12 @@ def compute_all_ratings(data):
         winner = match["winner"].strip().upper()
         season = match.get("season", 1)
 
-        # Initialize Career Stats
         for p in [p1, p2]:
             if p not in all_time:
                 all_time[p] = 1500.0
             if p not in player_stats:
                 player_stats[p] = {"played": 0, "wins": 0, "losses": 0}
 
-        # Initialize Season Dicts
         if season not in seasons:
             seasons[season] = {}
         if season not in season_stats:
@@ -60,30 +76,24 @@ def compute_all_ratings(data):
             if p not in season_stats[season]:
                 season_stats[season][p] = {"played": 0, "wins": 0, "losses": 0}
 
-        # Update Career Stats
         player_stats[p1]["played"] += 1
         player_stats[p2]["played"] += 1
-
-        # Update Seasonal Stats
         season_stats[season][p1]["played"] += 1
         season_stats[season][p2]["played"] += 1
 
         if winner == p1:
             player_stats[p1]["wins"] += 1
             player_stats[p2]["losses"] += 1
-
             season_stats[season][p1]["wins"] += 1
             season_stats[season][p2]["losses"] += 1
         else:
             player_stats[p2]["wins"] += 1
             player_stats[p1]["losses"] += 1
-
             season_stats[season][p2]["wins"] += 1
             season_stats[season][p1]["losses"] += 1
 
         outcome_p1 = 1.0 if winner == p1 else 0.0
 
-        # Process Elo Updates
         all_time[p1], all_time[p2] = calculate_elo(
             all_time[p1], all_time[p2], outcome_p1
         )
@@ -96,7 +106,7 @@ def compute_all_ratings(data):
 
 # --- 3. STREAMLIT APP UI ---
 st.set_page_config(page_title="Darts League Elo Tracker", layout="wide")
-st.title("DDL Elo Rankings")
+st.title("DDL Elo Ratings")
 
 data = load_data()
 all_time_elo, season_elos, player_stats, season_stats = compute_all_ratings(data)
@@ -105,7 +115,7 @@ tab1, tab2, tab3 = st.tabs(
     ["📊 Leaderboards", "📝 Log Match", "⚙️ Manage Matches & Players"]
 )
 
-# TAB 1: LEADERBOARDS & PLAYER PROFILES
+# TAB 1: LEADERBOARDS
 with tab1:
     col_left, col_right = st.columns([2, 1])
 
@@ -176,9 +186,7 @@ with tab1:
         st.header("Player Inspector")
         all_known_players = sorted(list(all_time_elo.keys()))
         if all_known_players:
-            inspect_p = st.selectbox(
-                "Select Player", options=all_known_players
-            )
+            inspect_p = st.selectbox("Select Player", options=all_known_players)
             st.metric("All-Time Elo", round(all_time_elo.get(inspect_p, 1500)))
 
             s_breakdown = {}
@@ -219,7 +227,6 @@ with tab2:
                 }
                 data["matches"].append(new_match)
 
-                # Ensure player names are registered
                 for p in [p1, p2]:
                     if p not in data["players"]:
                         data["players"].append(p)
@@ -250,7 +257,6 @@ with tab3:
             data["matches"] = [
                 m for m in data["matches"] if m["id"] != match_to_delete
             ]
-            # Re-index remaining match IDs
             for idx, m in enumerate(data["matches"]):
                 m["id"] = idx + 1
             save_data(data)
@@ -275,7 +281,6 @@ with tab3:
                 if old_name == new_name:
                     st.error("New name must be different from the old name!")
                 else:
-                    # 1. Update matches array
                     for m in data["matches"]:
                         if m["player1"] == old_name:
                             m["player1"] = new_name
@@ -284,7 +289,6 @@ with tab3:
                         if m["winner"] == old_name:
                             m["winner"] = new_name
 
-                    # 2. Update players array
                     data["players"] = [
                         new_name if p == old_name else p for p in data["players"]
                     ]
@@ -293,7 +297,7 @@ with tab3:
 
                     save_data(data)
                     st.success(
-                        f"Successfully renamed '{old_name}' to '{new_name}' across all records! Ratings recalculated."
+                        f"Successfully renamed '{old_name}' to '{new_name}' across all records!"
                     )
                     st.rerun()
             else:
