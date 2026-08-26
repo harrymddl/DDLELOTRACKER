@@ -17,7 +17,7 @@ def load_data():
 
 
 def save_data(data):
-    # Save locally to current session
+    # Save locally to current session memory
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
@@ -33,9 +33,13 @@ def save_data(data):
                 json.dumps(data, indent=4),
                 contents.sha,
             )
-            st.success("Synced permanently to GitHub!")
+            st.success("✅ Match permanently saved to GitHub!")
         except Exception as e:
-            st.error(f"GitHub Sync Error: {e}")
+            st.error(f"❌ GitHub Sync Failed: {e}")
+    else:
+        st.warning(
+            "⚠️ GITHUB_TOKEN not found in Streamlit Secrets! Match saved temporarily only."
+        )
 
 
 # --- 2. ELO ENGINE ---
@@ -232,9 +236,6 @@ with tab2:
                         data["players"].append(p)
 
                 save_data(data)
-                st.success(
-                    f"Logged Match #{new_match['id']}: {p1} vs {p2} (Winner: {winner})"
-                )
                 st.rerun()
 
 # TAB 3: MANAGE MATCHES & PLAYERS
