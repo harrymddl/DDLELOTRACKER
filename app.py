@@ -21,26 +21,6 @@ def save_data(data):
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
-    # Push directly to GitHub repository permanently
-    if "GITHUB_TOKEN" in st.secrets:
-        try:
-            g = Github(st.secrets["GITHUB_TOKEN"])
-            repo = g.get_repo(GITHUB_REPO)
-            contents = repo.get_contents(DATA_FILE)
-            repo.update_file(
-                contents.path,
-                "Auto-sync match result",
-                json.dumps(data, indent=4),
-                contents.sha,
-            )
-            st.success("✅ Match permanently saved to GitHub!")
-        except Exception as e:
-            st.error(f"❌ GitHub Sync Failed: {e}")
-    else:
-        st.warning(
-            "⚠️ GITHUB_TOKEN not found in Streamlit Secrets! Match saved temporarily only."
-        )
-
 
 # --- 2. ELO ENGINE ---
 def calculate_elo(r_a, r_b, outcome, k=32):
@@ -110,7 +90,7 @@ def compute_all_ratings(data):
 
 # --- 3. STREAMLIT APP UI ---
 st.set_page_config(page_title="Darts League Elo Tracker", layout="wide")
-st.title("DDL Elo Ratings")
+st.title("🎯 DDL Elo Ratings")
 
 data = load_data()
 all_time_elo, season_elos, player_stats, season_stats = compute_all_ratings(data)
@@ -204,6 +184,18 @@ with tab1:
 # TAB 2: LOG MATCH REPORT
 with tab2:
     st.header("Log a New Match Result")
+
+    # Display persistent status message after rerun
+    if "sync_status" in st.session_state:
+        status_type, status_msg = st.session_state["sync_status"]
+        if status_type == "success":
+            st.success(status_msg)
+        elif status_type == "error":
+            st.error(status_msg)
+        elif status_type == "warning":
+            st.warning(status_msg)
+        del st.session_state["sync_status"]
+
     col1, col2, col3 = st.columns(3)
 
     with col1:
@@ -236,6 +228,34 @@ with tab2:
                         data["players"].append(p)
 
                 save_data(data)
+
+                # Direct GitHub Sync with Session State Feedback
+                if "GITHUB_TOKEN" in st.secrets:
+                    try:
+                        g = Github(st.secrets["GITHUB_TOKEN"])
+                        repo = g.get_repo(GITHUB_REPO)
+                        contents = repo.get_contents(DATA_FILE)
+                        repo.update_file(
+                            contents.path,
+                            f"Auto-sync match #{new_match['id']}",
+                            json.dumps(data, indent=4),
+                            contents.sha,
+                        )
+                        st.session_state["sync_status"] = (
+                            "success",
+                            f"✅ Match #{new_match['id']} ({p1} vs {p2}) permanently saved to GitHub!",
+                        )
+                    except Exception as e:
+                        st.session_state["sync_status"] = (
+                            "error",
+                            f"❌ GitHub Sync Error: {e}",
+                        )
+                else:
+                    st.session_state["sync_status"] = (
+                        "warning",
+                        "⚠️ GITHUB_TOKEN not found in Streamlit Secrets! Match saved temporarily only.",
+                    )
+
                 st.rerun()
 
 # TAB 3: MANAGE MATCHES & PLAYERS
@@ -261,7 +281,28 @@ with tab3:
             for idx, m in enumerate(data["matches"]):
                 m["id"] = idx + 1
             save_data(data)
-            st.warning(f"Deleted Match #{match_to_delete}. Ratings recalculated!")
+
+            if "GITHUB_TOKEN" in st.secrets:
+                try:
+                    g = Github(st.secrets["GITHUB_TOKEN"])
+                    repo = g.get_repo(GITHUB_REPO)
+                    contents = repo.get_contents(DATA_FILE)
+                    repo.update_file(
+                        contents.path,
+                        f"Deleted match #{match_to_delete}",
+                        json.dumps(data, indent=4),
+                        contents.sha,
+                    )
+                    st.session_state["sync_status"] = (
+                        "success",
+                        f"✅ Deleted Match #{match_to_delete} and updated GitHub!",
+                    )
+                except Exception as e:
+                    st.session_state["sync_status"] = (
+                        "error",
+                        f"❌ GitHub Sync Error on Deletion: {e}",
+                    )
+
             st.rerun()
     else:
         st.info("No matches logged yet.")
@@ -297,9 +338,28 @@ with tab3:
                         data["players"].append(new_name)
 
                     save_data(data)
-                    st.success(
-                        f"Successfully renamed '{old_name}' to '{new_name}' across all records!"
-                    )
+
+                    if "GITHUB_TOKEN" in st.secrets:
+                        try:
+                            g = Github(st.secrets["GITHUB_TOKEN"])
+                            repo = g.get_repo(GITHUB_REPO)
+                            contents = repo.get_contents(DATA_FILE)
+                            repo.update_file(
+                                contents.path,
+                                f"Renamed {old_name} to {new_name}",
+                                json.dumps(data, indent=4),
+                                contents.sha,
+                            )
+                            st.session_state["sync_status"] = (
+                                "success",
+                                f"✅ Renamed '{old_name}' to '{new_name}' across all records on GitHub!",
+                            )
+                        except Exception as e:
+                            st.session_state["sync_status"] = (
+                                "error",
+                                f"❌ GitHub Sync Error on Rename: {e}",
+                            )
+
                     st.rerun()
             else:
                 st.error("Please enter a valid new name.")
