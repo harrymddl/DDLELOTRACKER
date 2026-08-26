@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 
 DATA_FILE = "darts_data.json"
-GITHUB_REPO = "harrymddl/DDLELOTRACKER"
+GITHUB_REPO = "harrymddl/ddlelotracker"
 
 
 # --- 1. DATA STORAGE & GITHUB AUTO-SYNC ---
