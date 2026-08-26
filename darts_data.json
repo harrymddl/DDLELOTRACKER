@@ -723,13 +723,6 @@
             "player1": "JAMIE",
             "player2": "NEIL",
             "winner": "NEIL"
-        },
-        {
-            "id": 103,
-            "season": 4,
-            "player1": "WADE",
-            "player2": "HARRY",
-            "winner": "HARRY"
         }
     ]
 }
