@@ -7,7 +7,8 @@
         "NEIL",
         "SAM",
         "SEAN",
-        "WADE"
+        "WADE",
+        "MARC"
     ],
     "matches": [
         {
@@ -751,6 +752,13 @@
             "player1": "DAVE",
             "player2": "SAM",
             "winner": "SAM"
+        },
+        {
+            "id": 107,
+            "season": 4,
+            "player1": "MARC",
+            "player2": "SEAN",
+            "winner": "MARC"
         }
     ]
 }
