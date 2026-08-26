@@ -808,6 +808,13 @@
             "player1": "WADE",
             "player2": "SAM",
             "winner": "WADE"
+        },
+        {
+            "id": 115,
+            "season": 4,
+            "player1": "JAMIE",
+            "player2": "HARRY",
+            "winner": "HARRY"
         }
     ]
 }
