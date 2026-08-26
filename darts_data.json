@@ -920,6 +920,13 @@
             "player1": "SAM",
             "player2": "SEAN",
             "winner": "SAM"
+        },
+        {
+            "id": 131,
+            "season": 4,
+            "player1": "HARRY",
+            "player2": "MARC",
+            "winner": "HARRY"
         }
     ]
 }
