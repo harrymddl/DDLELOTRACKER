@@ -1067,6 +1067,13 @@
             "player1": "MARC",
             "player2": "SEAN",
             "winner": "SEAN"
+        },
+        {
+            "id": 152,
+            "season": 4,
+            "player1": "WADE",
+            "player2": "SAM",
+            "winner": "SAM"
         }
     ]
 }
