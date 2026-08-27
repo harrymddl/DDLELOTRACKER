@@ -1123,6 +1123,13 @@
             "player1": "DAVE",
             "player2": "WADE",
             "winner": "DAVE"
+        },
+        {
+            "id": 160,
+            "season": 4,
+            "player1": "SAM",
+            "player2": "NEIL",
+            "winner": "NEIL"
         }
     ]
 }
